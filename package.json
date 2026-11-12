@@ -1,0 +1,23 @@
+{
+  "name": "soap-hands",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "fetch-model": "bash scripts/fetch-model.sh",
+    "test": "node tests/decode.test.ts && node tests/lift.test.ts && node tests/catenoid.test.ts && node tests/relax.test.ts && node tests/tracker.test.ts && node tests/ringMode.test.ts"
+  },
+  "dependencies": {
+    "onnxruntime-web": "1.31.1",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/three": "0.186.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

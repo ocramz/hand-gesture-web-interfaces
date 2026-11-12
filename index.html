@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Soap Hands</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #07080a; overflow: hidden; }
+      body { font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif; color: #dfe6ee; }
+      canvas { display: block; }
+      #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+      #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+      #status { position: fixed; left: 12px; bottom: 12px; padding: 6px 10px; border-radius: 6px;
+        background: rgba(8, 10, 14, 0.6); backdrop-filter: blur(6px); font-variant-numeric: tabular-nums;
+        white-space: pre; }
+      #hint { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); padding: 6px 12px;
+        border-radius: 6px; background: rgba(8, 10, 14, 0.55); transition: opacity 0.6s; }
+      #hint.hidden { opacity: 0; }
+      #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        padding: 24px; text-align: center; white-space: pre-wrap; }
+      #error.shown { display: flex; }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+    <div id="hint">Cup both hands as if holding a ball · 1 rings · 2 saddle · D debug</div>
+    <div id="status">starting…</div>
+    <div id="error"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
