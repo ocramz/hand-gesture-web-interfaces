@@ -1,8 +1,8 @@
-// Soap Hands: the webcam's hands hold soap films. Hand pose from a YOLO26 model in onnxruntime-web (in a
-// worker); films, rings and bubbles in three.js.
+// Soap Hands: the webcam's hands hold soap films. Hand pose from a YOLO26 model in onnxruntime-web, or in
+// tract (wasm) with ?engine=tract, in a worker; films, rings and bubbles in three.js.
 //
 // URL parameters: ?image=/samples/two_hands.jpg (a still image instead of the webcam), mirror=0|1,
-// backend=webgpu|wasm, precision=fp16|fp32, mode=rings|saddle, debug=1, gui=0.
+// engine=ort|tract, backend=webgpu|wasm, precision=fp16|fp32, mode=rings|saddle, debug=1, gui=0.
 import { Vector3, type Mesh } from 'three'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
 import { HandPose, openImage, openWebcam, Stage, type Backend, type Finger, type FrameSource, type Precision } from '@ocramz/handpose'
@@ -87,6 +87,7 @@ async function main(): Promise<void> {
 
   // Hand pose.
   const pose = new HandPose({
+    engine: query.get('engine') === 'tract' ? 'tract' : 'ort',
     backend: (query.get('backend') as Backend | null) ?? 'auto',
     precision: (query.get('precision') as Precision | null) ?? 'auto',
     confThreshold: params.confidence,

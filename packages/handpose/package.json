@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "author": "ocramz",
-  "description": "Webcam hand pose in the browser: YOLO26 in onnxruntime-web (worker), tracking, 2D → 3D lifting.",
+  "description": "Webcam hand pose in the browser: YOLO26 in onnxruntime-web or tract (wasm), in a worker; tracking, 2D \u2192 3D lifting.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./vite.ts"
   },
   "scripts": {
-    "test": "node --test tests/*.test.ts",
+    "test": "node --test tests/*.test.ts && cargo test --release --manifest-path tract/Cargo.toml",
     "typecheck": "tsc --noEmit",
+    "build:wasm": "bash scripts/build-wasm.sh",
     "fetch-model": "bash scripts/fetch-model.sh"
   },
   "dependencies": {

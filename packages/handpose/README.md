@@ -1,11 +1,40 @@
 # @ocramz/handpose
 
-Hand pose from the webcam, in the browser: a YOLO26 hand-pose model in onnxruntime-web (in a worker),
-two stable tracked hands, and their keypoints lifted to 3D camera space. Plus a three.js stage that shows
+Hand pose from the webcam, in the browser: a YOLO26 hand-pose model in onnxruntime-web or in
+[tract](https://github.com/sonos/tract) compiled to wasm (in a worker), two stable tracked hands, and their
+keypoints lifted to 3D camera space. Plus a three.js stage that shows
 the camera frame with a matched 3D camera, so anything placed at a hand's 3D position lands on its pixels.
 
 Chrome or Safari with WebGPU: the model runs on the GPU (fp16). Without usable WebGPU it falls back to
 multithreaded WASM (fp32), at a few frames per second.
+
+## Engines
+
+`new HandPose({ engine })` picks what runs the model:
+
+- **`ort`** (default): onnxruntime-web. The worker letterboxes, runs the model and decodes; tracking runs
+  on the main thread (`HandTracker`).
+- **`tract`**: the whole vision pipeline in Rust, compiled to wasm (`tract/`). The worker only draws the
+  frame onto a 640² canvas. tract uploads and normalizes it on the GPU (`Tensor::from_canvas_normalized`),
+  runs YOLO26 on its `wgpu` runtime, then decodes, canonicalizes and tracks the hands, and the worker posts
+  the two tracked slots back. Without WebGPU it runs on tract's CPU runtime: wasm simd128 on one thread,
+  about 0.7 s per frame.
+
+  The graph is cut just before its end-to-end selection (TopK, GatherElements on the head's 8400 anchors):
+  tract's WebGPU runtime has no kernels for those ops, and in a browser it cannot hand them to the CPU in
+  the middle of a graph. `top_detections` in `tract/src/decode.rs` does the selection instead, and
+  `tests/native.rs` checks that it gives exactly the rows of the uncut graph's `output0`.
+
+`tract/src/decode.rs` and `tract/src/tracker.rs` are ports of `src/pose/decode.ts` and `src/pose/tracker.ts`
+(the ORT path still uses those): change both together.
+
+Building the tract engine needs Rust with the wasm target and the wasm-bindgen CLI that `tract/Cargo.lock`
+pins. `npm run dev`, `build` and `typecheck` at the repo root build it first (`npm run build:wasm`).
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.128 --locked
+```
 
 ## Use
 
@@ -39,6 +68,7 @@ stage.renderer.setAnimationLoop(() => {
 | Piece | Where |
 |---|---|
 | Frame → 640² letterbox → model → hands (end-to-end output `[1, 300, 69]`, no NMS) | `src/pose/worker.ts`, `src/pose/decode.ts` |
+| The same in tract, with tracking: Rust pipeline and its wasm API, worker, result unpacking | `tract/src/`, `src/pose/tractWorker.ts`, `src/pose/packed.ts` |
 | Worker client: init, frame pumping, timings | `src/pose/client.ts` (`HandPose`) |
 | Keypoint order repair (see below) | `canonicalize` in `src/pose/decode.ts` |
 | Two stable hand slots, hysteresis, One-Euro smoothing | `src/pose/tracker.ts`, `src/hands.ts` |
@@ -70,6 +100,6 @@ non-commercially. `assets/samples/two_hands.jpg` is the public-domain Wikimedia 
 ## Checks
 
 ```sh
-npm test            # decode, lift, tracker
-npm run typecheck
+npm test            # decode, lift, tracker (TS); then cargo test: the Rust ports and the real model on the samples
+npm run typecheck   # from the repo root, which builds the wasm bindings it type-checks against
 ```

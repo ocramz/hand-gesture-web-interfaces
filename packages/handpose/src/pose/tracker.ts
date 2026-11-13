@@ -40,7 +40,20 @@ function alpha(cutoff: number, dt: number): number {
   return 1 / (1 + tau / dt)
 }
 
-export interface Slot {
+/** What the views read from a tracked hand slot, wherever it was tracked (here, or in the tract worker). */
+export interface TrackedSlot {
+  active: boolean
+  /** Smoothed keypoints, source pixels, NUM_KP × (x, y, visibility). */
+  kp: Float32Array
+  conf: number
+}
+
+/** Two tracked slots: 0 = left of the screen, 1 = right. */
+export interface TrackedSlots {
+  readonly slots: readonly [TrackedSlot, TrackedSlot]
+}
+
+export interface Slot extends TrackedSlot {
   /** Shown: seen in `minHits` frames running, and not yet missed `maxMisses` times running. */
   active: boolean
   /** Smoothed keypoints, source pixels, NUM_KP × (x, y, visibility). Held while the hand is briefly lost. */
@@ -62,7 +75,7 @@ const DEFAULTS: TrackerOptions = { minHits: 2, maxMisses: 5, minCutoff: 1.2, bet
 
 function boxCenterX(h: Hand): number { return (h.box[0] + h.box[2]) / 2 }
 
-export class HandTracker {
+export class HandTracker implements TrackedSlots {
   readonly slots: [Slot, Slot]
   readonly opts: TrackerOptions
 

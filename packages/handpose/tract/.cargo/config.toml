@@ -1,0 +1,4 @@
+# tract-linalg's wasm kernels (GEMM, conv, activations) are compiled only with simd128: without it the CPU
+# runtime falls back to scalar code. Every browser that runs this app (WebGPU or not) has had simd128 since 2021.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

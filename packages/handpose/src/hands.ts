@@ -3,7 +3,7 @@
 import { Vector3 } from 'three'
 import type { CameraModel } from './camera.ts'
 import { handDepth } from './lift.ts'
-import type { HandTracker } from './pose/tracker.ts'
+import type { TrackedSlots } from './pose/tracker.ts'
 import { NUM_KP } from './pose/types.ts'
 
 export class HandView {
@@ -42,6 +42,6 @@ export class HandView {
   }
 }
 
-export function updateHandViews(views: readonly [HandView, HandView], tracker: HandTracker, cam: CameraModel, dt: number, handScale: number): void {
+export function updateHandViews(views: readonly [HandView, HandView], tracker: TrackedSlots, cam: CameraModel, dt: number, handScale: number): void {
   for (let i = 0; i < 2; i++) views[i].update(tracker.slots[i].active, tracker.slots[i].kp, cam, dt, handScale)
 }
