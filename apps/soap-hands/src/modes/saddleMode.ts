@@ -2,10 +2,8 @@
 // the two wires make, its free edges bowing inward. Twist the hands against each other and the film
 // becomes a helicoid-like saddle.
 import { Group, Vector3 } from 'three'
+import { KP, raysOnPlane, ringNormal, type HandView } from '@ocramz/handpose'
 import { patchGrid, writeCoons, type Curve } from '../geom/grids.ts'
-import { raysOnPlane, ringNormal } from '../geom/lift.ts'
-import type { HandView } from '../hands.ts'
-import { KP } from '../pose/types.ts'
 import { FilmSurface } from '../render/filmSurface.ts'
 import type { SharedFilmUniforms } from '../render/filmMaterial.ts'
 import { Tube } from '../render/tube.ts'

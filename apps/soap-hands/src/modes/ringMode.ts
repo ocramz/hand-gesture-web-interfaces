@@ -3,11 +3,10 @@
 // ring, and a free bubble. Bring the discs close again and the catenoid re-forms. One hand alone holds a
 // disc, like a bubble wand.
 import { Group, Vector3 } from 'three'
+import { ringNormal, TIP, type HandView } from '@ocramz/handpose'
 import { neckRadius, solveCatenoid, type Catenoid } from '../geom/catenoid.ts'
 import { discGrid, ringAxes, tubeGrid, writeCatenoid, writeDisc } from '../geom/grids.ts'
-import { fitRing, newRing, ringNormal, type Ring } from '../geom/lift.ts'
-import type { HandView } from '../hands.ts'
-import { TIP } from '../pose/types.ts'
+import { fitRing, newRing, type Ring } from '../geom/ring.ts'
 import { FilmSurface } from '../render/filmSurface.ts'
 import type { SharedFilmUniforms } from '../render/filmMaterial.ts'
 import { Tube } from '../render/tube.ts'

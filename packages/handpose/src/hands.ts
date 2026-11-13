@@ -1,8 +1,8 @@
 // Per-slot hand state the shapes read: display-smoothed keypoints, a smoothed depth, and the 21 camera
 // rays (points at depth 1). point(k) is keypoint k at the hand's depth.
 import { Vector3 } from 'three'
-import type { CameraModel } from './geom/camera.ts'
-import { handDepth } from './geom/lift.ts'
+import type { CameraModel } from './camera.ts'
+import { handDepth } from './lift.ts'
 import type { HandTracker } from './pose/tracker.ts'
 import { NUM_KP } from './pose/types.ts'
 

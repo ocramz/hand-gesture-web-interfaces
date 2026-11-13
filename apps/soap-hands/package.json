@@ -1,0 +1,19 @@
+{
+  "name": "@ocramz/soap-hands",
+  "version": "0.1.0",
+  "private": true,
+  "author": "ocramz",
+  "description": "Hold a soap film between your hands.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ocramz/handpose": "*",
+    "three": "0.186.1"
+  }
+}
