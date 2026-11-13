@@ -16,7 +16,8 @@ export interface HandPoseOptions {
   precision?: Precision | 'auto'
   /** Detection confidence threshold, 0..1. */
   confThreshold?: number
-  /** Model URLs; default: `models/yolo26_hand_pose_{fp16,fp32}.onnx` under the app's base URL. */
+  /** Model URLs; default: the weights bundled with the package (`@ocramz/handpose/models/*`), resolved by
+   * the app's bundler. Set them to serve the weights from elsewhere (a CDN). */
   modelUrls?: Record<Precision, string>
   /** Model download progress, as a status line. */
   onProgress?: (message: string) => void
@@ -61,10 +62,11 @@ export class HandPose {
       this.remote = null
       this.tracker = this.localTracker
     }
-    // Two literal URLs: Vite bundles a worker only from `new Worker(new URL('<literal>', import.meta.url))`.
+    // Two literal URLs: bundlers (Vite, webpack 5, …) bundle a worker only from
+    // `new Worker(new URL('<literal>', import.meta.url))`. They name the compiled files next to this one in dist/.
     this.worker = engine === 'tract'
-      ? new Worker(new URL('./tractWorker.ts', import.meta.url), { type: 'module' })
-      : new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+      ? new Worker(new URL('./tractWorker.js', import.meta.url), { type: 'module' })
+      : new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
     this.worker.onmessage = (e: MessageEvent<FromWorker>) => {
       const m = e.data
       if (m.type === 'progress') {
@@ -94,10 +96,11 @@ export class HandPose {
       }
     }
     this.worker.onerror = e => onFatal?.(`Worker error: ${e.message}`)
-    const base = new URL(import.meta.env.BASE_URL, location.href)
+    // The weights ship in the package (assets/models/, two levels up from dist/pose/). Literal URLs again, so
+    // that bundlers emit them as assets.
     const modelUrls = opts.modelUrls ?? {
-      fp16: new URL('models/yolo26_hand_pose_fp16.onnx', base).href,
-      fp32: new URL('models/yolo26_hand_pose_fp32.onnx', base).href,
+      fp16: new URL('../../assets/models/yolo26_hand_pose_fp16.onnx', import.meta.url).href,
+      fp32: new URL('../../assets/models/yolo26_hand_pose_fp32.onnx', import.meta.url).href,
     }
     this.send({ type: 'init', urls: modelUrls, backend, precision, confThreshold, tracker: opts.tracker })
   }

@@ -4,7 +4,8 @@
 // URL parameters: ?image=/samples/two_hands.jpg (a still image instead of the webcam), mirror=0|1,
 // engine=tract|ort (to compare with onnxruntime-web), backend=webgpu|wasm, precision=fp16|fp32, debug=1.
 import { DirectionalLight, HemisphereLight } from 'three'
-import { HandPose, openImage, openWebcam, Stage, type Backend, type FrameSource, type Precision } from '@ocramz/handpose'
+import { HandPose, openImage, openWebcam, type Backend, type FrameSource, type Precision } from '@ocramz/handpose'
+import { Stage } from '@ocramz/handpose-three'
 import { HandSkeleton } from './skeleton.ts'
 
 const query = new URLSearchParams(location.search)

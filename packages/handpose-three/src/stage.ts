@@ -1,13 +1,10 @@
 // A fullscreen three.js stage over the camera frame: the video cover-fits the canvas as the background, and
 // the 3D camera's fov is matched to it, so a point in camera space lands on the pixel the webcam saw it at.
 // A 2D overlay canvas on top carries the debug drawing.
-import { NoToneMapping, PerspectiveCamera, Scene, WebGLRenderer } from 'three'
-import { CameraModel } from './camera.ts'
-import type { HandView } from './hands.ts'
-import type { Hand } from './pose/types.ts'
-import { createBackground, type Background } from './render/background.ts'
-import { clearOverlay, drawDebug } from './render/debugOverlay.ts'
-import type { FrameSource } from './source.ts'
+import { NoToneMapping, PerspectiveCamera, Scene, WebGLRenderer, type Texture } from 'three'
+import { CameraModel, clearOverlay, drawDebug, type FrameSource, type Hand, type HandView } from '@ocramz/handpose'
+import { createBackground, type Background } from './background.ts'
+import { sourceTexture } from './texture.ts'
 
 export interface StageOptions {
   canvas: HTMLCanvasElement
@@ -35,6 +32,8 @@ export class Stage {
   readonly cam = new CameraModel()
   readonly background: Background
   readonly source: FrameSource
+  /** The source's frames as a three.js texture (what the background shows). */
+  readonly texture: Texture
   readonly mirror: boolean
   private readonly overlay: HTMLCanvasElement
   private readonly octx: CanvasRenderingContext2D
@@ -51,7 +50,8 @@ export class Stage {
     this.renderer.toneMapping = NoToneMapping
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
     this.cam.set(this.source.width, this.source.height, this.hfovDeg, this.mirror)
-    this.background = createBackground(this.source.texture)
+    this.texture = sourceTexture(this.source)
+    this.background = createBackground(this.texture)
     this.scene.add(this.background.mesh)
     addEventListener('resize', () => this.resize())
     this.resize()

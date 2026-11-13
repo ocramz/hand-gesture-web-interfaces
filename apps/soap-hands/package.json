@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@ocramz/handpose": "*",
+    "@ocramz/handpose-three": "*",
     "three": "0.186.1"
   }
 }

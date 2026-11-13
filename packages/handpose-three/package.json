@@ -1,0 +1,20 @@
+{
+  "name": "@ocramz/handpose-three",
+  "version": "0.1.0",
+  "private": true,
+  "author": "ocramz",
+  "license": "AGPL-3.0-only",
+  "description": "three.js stage and Vite plugin for the apps in this repo built on @ocramz/handpose.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./vite.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ocramz/handpose": "*",
+    "three": "0.186.1"
+  }
+}

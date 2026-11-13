@@ -1,0 +1,95 @@
+# Builds the tract wasm and @ocramz/handpose, type-checks and tests every workspace, packs the npm tarball,
+# and smoke-tests that tarball in a fresh Vite app in headless Chromium. release.yml reuses this workflow and
+# publishes the exact tarball it uploads.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    outputs:
+      tarball:
+        description: File name of the packed @ocramz/handpose tarball in the handpose-tarball artifact.
+        value: ${{ jobs.build.outputs.tarball }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/handpose/tract
+
+      # The wasm-bindgen CLI must be exactly the version tract/Cargo.lock pins (scripts/build-wasm.sh checks).
+      - name: Read the pinned wasm-bindgen version
+        id: wb
+        run: |
+          v=$(grep -A1 '^name = "wasm-bindgen"$' packages/handpose/tract/Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@${{ steps.wb.outputs.version }}
+
+      - run: npm ci
+
+      - name: Build (tract wasm, @ocramz/handpose, apps)
+        run: npm run build
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test (TypeScript, then the Rust pipeline on the real model)
+        run: npm test
+
+      - name: Pack @ocramz/handpose
+        id: pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/pkg"
+          npm pack -w @ocramz/handpose --pack-destination "$RUNNER_TEMP/pkg" --json > "$RUNNER_TEMP/pack.json"
+          tarball=$(node -p 'require(process.argv[1])[0].filename' "$RUNNER_TEMP/pack.json")
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          node -e '
+            const [p] = require(process.argv[1])
+            const files = new Set(p.files.map(f => f.path))
+            const need = ["dist/index.js", "dist/index.d.ts", "dist/pose/client.js", "dist/pose/worker.js",
+              "dist/pose/tractWorker.js", "tract/pkg/handpose_tract.js", "tract/pkg/handpose_tract_bg.wasm",
+              "assets/models/yolo26_hand_pose_fp16.onnx", "assets/models/yolo26_hand_pose_fp32.onnx", "LICENSE", "NOTICE.md"]
+            const missing = need.filter(f => !files.has(f))
+            console.log(`${p.filename}: ${p.entryCount} files, ${(p.size / 1e6).toFixed(1)} MB packed, ${(p.unpackedSize / 1e6).toFixed(1)} MB unpacked`)
+            if (missing.length) { console.error("missing from the tarball:", missing.join(", ")); process.exit(1) }
+          ' "$RUNNER_TEMP/pack.json"
+
+      - name: Smoke-test the tarball in a fresh Vite app (headless Chromium, both engines)
+        env:
+          PLAYWRIGHT_DEPS: '1'
+        run: bash packages/handpose/test-consumer/run-smoke.sh "$RUNNER_TEMP/pkg/${{ steps.pack.outputs.tarball }}" "$RUNNER_TEMP/consumer"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: handpose-tarball
+          path: ${{ runner.temp }}/pkg/${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 14

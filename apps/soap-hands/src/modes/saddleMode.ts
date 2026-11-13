@@ -55,7 +55,7 @@ export class SaddleMode implements Shape {
       this.ok[i] = false
       if (!h.active) continue
       const n = ringNormal(this.anchors[i], hands[1 - i].active ? this.anchors[1 - i] : null, p.tilt, 0.25, _n)
-      this.ok[i] = raysOnPlane([h.rays[KP.thumbTip], h.rays[KP.indexTip]], this.anchors[i], n, this.pts[i] as unknown as Vector3[])
+      this.ok[i] = raysOnPlane([h.rays[KP.thumbTip], h.rays[KP.indexTip]], this.anchors[i], n, this.pts[i])
     }
     const both = this.ok[0] && this.ok[1]
     this.film.setFadeTarget(both ? 1 : 0)

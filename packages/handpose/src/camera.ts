@@ -1,6 +1,6 @@
 // The webcam as a pinhole camera in source-video pixels, and how the canvas shows it. Camera space is
-// three.js's: x right, y up, looking down −z, metres. The selfie view mirrors x.
-import { Vector3 } from 'three'
+// three.js's (and WebGL's): x right, y up, looking down −z, metres. The selfie view mirrors x.
+import { setVec3, vec3, type Vec3 } from './vec3.ts'
 
 export class CameraModel {
   width = 1280
@@ -17,9 +17,9 @@ export class CameraModel {
   }
 
   /** The point at depth 1 (z = −1) on the ray through source pixel (x, y). */
-  ray(x: number, y: number, out = new Vector3()): Vector3 {
+  ray<T extends Vec3 = Vec3>(x: number, y: number, out: T = vec3() as T): T {
     const dx = (x - this.width / 2) / this.f
-    return out.set(this.mirror ? -dx : dx, -(y - this.height / 2) / this.f, -1)
+    return setVec3(out, this.mirror ? -dx : dx, -(y - this.height / 2) / this.f, -1)
   }
 
   /** Canvas pixels per source pixel when the video covers a cw × ch canvas. */
@@ -29,7 +29,7 @@ export class CameraModel {
 
   /**
    * For a cw × ch canvas showing the video cover-fitted: the vertical fov (degrees) of the matching
-   * three.js camera, and the fraction of the video's width and height that is visible.
+   * perspective camera, and the fraction of the video's width and height that is visible.
    */
   coverFit(cw: number, ch: number): { fovDeg: number; uvScale: [number, number] } {
     const s = this.coverScale(cw, ch)

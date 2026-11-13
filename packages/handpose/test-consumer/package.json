@@ -1,0 +1,10 @@
+{
+  "name": "handpose-test-consumer",
+  "private": true,
+  "description": "Installs the packed @ocramz/handpose tarball like an npm user would, bundles it with plain Vite, and runs both engines in headless Chromium. Run via run-smoke.sh, not as a workspace.",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "smoke": "node smoke.mjs"
+  }
+}

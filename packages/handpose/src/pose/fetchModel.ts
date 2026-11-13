@@ -4,7 +4,7 @@ import type { FromWorker } from './types.ts'
 
 export async function fetchModel(url: string, post: (m: FromWorker) => void): Promise<Uint8Array> {
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status} (run npm run fetch-model)`)
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status} (did the bundler emit the .onnx assets? or set modelUrls)`)
   const total = Number(res.headers.get('content-length')) || 0
   const file = url.split('/').pop() ?? url
   if (!res.body) return new Uint8Array(await res.arrayBuffer())
@@ -23,7 +23,7 @@ export async function fetchModel(url: string, post: (m: FromWorker) => void): Pr
   let o = 0
   for (const c of chunks) { out.set(c, o); o += c.length }
   // A dev server's fallback page is not a model.
-  if (out.length < 1 << 20) throw new Error(`${url} is ${out.length} bytes: not the model (run npm run fetch-model)`)
+  if (out.length < 1 << 20) throw new Error(`${url} is ${out.length} bytes: not the model (check modelUrls, or that the bundler emitted the .onnx assets)`)
   return out
 }
 

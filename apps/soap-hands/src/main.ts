@@ -5,7 +5,8 @@
 // engine=ort|tract, backend=webgpu|wasm, precision=fp16|fp32, mode=rings|saddle, debug=1, gui=0.
 import { Vector3, type Mesh } from 'three'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
-import { HandPose, openImage, openWebcam, Stage, type Backend, type Finger, type FrameSource, type Precision } from '@ocramz/handpose'
+import { HandPose, openImage, openWebcam, type Backend, type Finger, type FrameSource, type Precision } from '@ocramz/handpose'
+import { Stage } from '@ocramz/handpose-three'
 import type { ShapeParams, Shape } from './modes/common.ts'
 import { RingMode } from './modes/ringMode.ts'
 import { SaddleMode } from './modes/saddleMode.ts'
@@ -70,7 +71,7 @@ async function main(): Promise<void> {
   const { scene, background } = stage
 
   const shared = sharedFilmUniforms()
-  shared.uVideo.value = source.texture
+  shared.uVideo.value = stage.texture
   shared.uMirror.value = mirror ? 1 : 0
 
   const droplets = new Droplets()

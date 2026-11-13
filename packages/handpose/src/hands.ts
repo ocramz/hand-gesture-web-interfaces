@@ -1,10 +1,10 @@
 // Per-slot hand state the shapes read: display-smoothed keypoints, a smoothed depth, and the 21 camera
 // rays (points at depth 1). point(k) is keypoint k at the hand's depth.
-import { Vector3 } from 'three'
 import type { CameraModel } from './camera.ts'
 import { handDepth } from './lift.ts'
 import type { TrackedSlots } from './pose/tracker.ts'
 import { NUM_KP } from './pose/types.ts'
+import { scaleVec3, vec3, type Vec3 } from './vec3.ts'
 
 export class HandView {
   active = false
@@ -12,10 +12,10 @@ export class HandView {
   presence = 0
   depth = NaN
   readonly kp = new Float32Array(NUM_KP * 3)
-  readonly rays: Vector3[] = Array.from({ length: NUM_KP }, () => new Vector3())
+  readonly rays: Vec3[] = Array.from({ length: NUM_KP }, () => vec3())
   private seeded = false
 
-  point(k: number, out: Vector3): Vector3 { return out.copy(this.rays[k]).multiplyScalar(this.depth) }
+  point<T extends Vec3>(k: number, out: T): T { return scaleVec3(out, this.rays[k], this.depth) }
 
   update(slotActive: boolean, slotKp: Float32Array, cam: CameraModel, dt: number, handScale: number): void {
     if (slotActive) {
