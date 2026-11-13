@@ -22,7 +22,7 @@ npm run dev   # from the repo root, or from this directory — http://localhost:
 film and camera settings.
 
 URL parameters: `?image=/samples/two_hands.jpg` runs on a still image instead of the webcam,
-`mirror=0|1`, `backend=webgpu|wasm`, `precision=fp16|fp32`, `mode=rings|saddle`, `debug=1`, `gui=0`.
+`mirror=0|1`, `engine=ort|tract`, `backend=webgpu|wasm`, `precision=fp16|fp32`, `mode=rings|saddle`, `debug=1`, `gui=0`.
 
 ## How it works
 

@@ -8,10 +8,12 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @ocramz/soap-hands",
-    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run build:wasm -w @ocramz/handpose && npm run dev -w @ocramz/soap-hands",
+    "dev:tract": "npm run build:wasm -w @ocramz/handpose && npm run dev -w @ocramz/tract-hands",
+    "build": "npm run build:wasm -w @ocramz/handpose && npm run build --workspaces --if-present",
+    "build:wasm": "npm run build:wasm -w @ocramz/handpose",
     "test": "npm test --workspaces",
-    "typecheck": "npm run typecheck --workspaces",
+    "typecheck": "npm run build:wasm -w @ocramz/handpose && npm run typecheck --workspaces",
     "fetch-model": "npm run fetch-model -w @ocramz/handpose"
   },
   "devDependencies": {

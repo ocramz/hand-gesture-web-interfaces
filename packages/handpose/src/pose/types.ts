@@ -1,4 +1,5 @@
 // The hand-pose model's keypoints: Ultralytics Hand Keypoints (MediaPipe's 21-point layout).
+import type { TrackedSlot, TrackerOptions } from './tracker.ts'
 
 export const NUM_KP = 21
 /** One output row: x1, y1, x2, y2, conf, class, then (x, y, visibility) per keypoint. */
@@ -38,10 +39,16 @@ export interface Hand {
 
 export type Precision = 'fp16' | 'fp32'
 export type Backend = 'webgpu' | 'wasm'
+/** Which inference library runs the model: onnxruntime-web, or tract compiled to wasm (tract/). */
+export type Engine = 'ort' | 'tract'
 
 export type ToWorker =
-  | { type: 'init'; urls: Record<Precision, string>; backend: Backend | 'auto'; precision: Precision | 'auto'; confThreshold: number }
-  | { type: 'frame'; bitmap: ImageBitmap; srcW: number; srcH: number; t: number }
+  | {
+    type: 'init'; urls: Record<Precision, string>; backend: Backend | 'auto'; precision: Precision | 'auto'; confThreshold: number
+    /** tract only: its tracker runs in the worker. */
+    tracker?: Partial<TrackerOptions>
+  }
+  | { type: 'frame'; bitmap: ImageBitmap; srcW: number; srcH: number; t: number; mirror: boolean }
   | { type: 'config'; confThreshold: number }
 
 export type FromWorker =
@@ -49,3 +56,5 @@ export type FromWorker =
   | { type: 'ready'; backend: Backend; precision: Precision; threads: number; note: string }
   | { type: 'error'; message: string }
   | { type: 'result'; hands: Hand[]; t: number; inferMs: number; prepMs: number }
+  /** tract: the detections and the worker's tracked slots. */
+  | { type: 'tracked'; hands: Hand[]; slots: [TrackedSlot, TrackedSlot]; t: number; inferMs: number; prepMs: number }

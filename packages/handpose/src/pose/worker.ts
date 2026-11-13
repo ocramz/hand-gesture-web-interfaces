@@ -2,6 +2,7 @@
 // Receives frames as ImageBitmaps, letterboxes them to 640², and posts back decoded hands.
 import * as ort from 'onnxruntime-web/webgpu'
 import { decodeHands, letterbox, rgbaToChw } from './decode.ts'
+import { fetchModel, SLOW_GPU_MS, webgpuAvailable } from './fetchModel.ts'
 import { MODEL_SIZE, type Backend, type FromWorker, type Precision, type ToWorker } from './types.ts'
 
 const scope = self as unknown as {
@@ -18,37 +19,6 @@ let outputName = 'output0'
 let confThreshold = 0.4
 let ctx: OffscreenCanvasRenderingContext2D | null = null
 const input = new Float32Array(3 * MODEL_SIZE * MODEL_SIZE)
-
-async function fetchModel(url: string): Promise<Uint8Array> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status} (run npm run fetch-model)`)
-  const total = Number(res.headers.get('content-length')) || 0
-  const file = url.split('/').pop() ?? url
-  if (!res.body) return new Uint8Array(await res.arrayBuffer())
-  const reader = res.body.getReader()
-  const chunks: Uint8Array[] = []
-  let loaded = 0
-  let last = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    chunks.push(value)
-    loaded += value.length
-    if (loaded - last > 1 << 20) { last = loaded; post({ type: 'progress', loaded, total, file }) }
-  }
-  const out = new Uint8Array(loaded)
-  let o = 0
-  for (const c of chunks) { out.set(c, o); o += c.length }
-  // A dev server's fallback page is not a model.
-  if (out.length < 1 << 20) throw new Error(`${url} is ${out.length} bytes: not the model (run npm run fetch-model)`)
-  return out
-}
-
-async function webgpuAvailable(): Promise<boolean> {
-  const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu
-  if (!gpu) return false
-  try { return (await gpu.requestAdapter()) != null } catch { return false }
-}
 
 async function init(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
   confThreshold = msg.confThreshold
@@ -67,7 +37,7 @@ async function init(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
     // A WebGPU session that runs fast enough wins; a slow one (a software adapter) races WASM.
     if (best && (best.backend === 'wasm' || best.ms < SLOW_GPU_MS)) break
     try {
-      bytes[precision] ??= await fetchModel(msg.urls[precision])
+      bytes[precision] ??= await fetchModel(msg.urls[precision], post)
       const s = await ort.InferenceSession.create(bytes[precision], {
         executionProviders: [backend],
         graphOptimizationLevel: 'all',
@@ -91,9 +61,6 @@ async function init(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
   outputName = session.outputNames[0]
   post({ type: 'ready', backend: best.backend, precision: best.precision, threads: best.backend === 'wasm' ? threads : 0, note: notes.join('; ') })
 }
-
-/** Above this per-frame time a WebGPU session is suspected to be a software adapter. */
-const SLOW_GPU_MS = 250
 
 /** Warms a session up (the first run compiles shaders and allocates) and times a second run. */
 async function timeRuns(s: ort.InferenceSession): Promise<number> {
