@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # No default features: they bring CUDA, Metal, pulse and the CLI, which a browser build has no use for.
 tract = { version = "=0.23.10", default-features = false, features = ["onnx", "wgpu", "unstable-wgpu-async"] }
 

@@ -25,6 +25,10 @@ multithreaded WASM (fp32), at a few frames per second.
   the middle of a graph. `top_detections` in `tract/src/decode.rs` does the selection instead, and
   `tests/native.rs` checks that it gives exactly the rows of the uncut graph's `output0`.
 
+  Firefox finishes WebGPU readbacks on a 100 ms timer. The three outputs are downloaded at once, and
+  while they are pending the worker submits empty command lists to make Firefox check sooner
+  (`src/pose/firefoxPoll.ts`). Without that, a frame took about 350 ms on Firefox instead of about 85 ms.
+
 `tract/src/decode.rs` and `tract/src/tracker.rs` are ports of `src/pose/decode.ts` and `src/pose/tracker.ts`
 (the ORT path still uses those): change both together.
 

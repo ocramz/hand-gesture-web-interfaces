@@ -33,6 +33,11 @@ impl HandPipeline {
         Ok(HandPipeline { inner: Pipeline::new(runnable, conf_threshold), gpu })
     }
 
+    /// The GPUDevice the wgpu runtime runs on (after a `"wgpu"` pipeline was created), else null.
+    pub fn device() -> JsValue {
+        tract::wgpu_device().unwrap_or(JsValue::NULL)
+    }
+
     /// Where a `width × height` bitmap goes in the 640² input: `[scale, padX, padY, w, h]`.
     pub fn letterbox(width: f64, height: f64) -> Vec<f64> {
         let lb = Pipeline::letterbox(width, height);

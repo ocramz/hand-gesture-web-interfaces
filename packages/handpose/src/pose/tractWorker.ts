@@ -4,6 +4,7 @@
 // hands and tracks them into two smoothed slots, which it posts back.
 import init, { HandPipeline } from '../../tract/pkg/handpose_tract.js'
 import { fetchModel, SLOW_GPU_MS, webgpuAvailable } from './fetchModel.ts'
+import { isFirefox, withCompletionPoll, type SubmitQueue } from './firefoxPoll.ts'
 import { unpackTracked } from './packed.ts'
 import { MODEL_SIZE, type Backend, type FromWorker, type Precision, type ToWorker } from './types.ts'
 import type { TrackerOptions } from './tracker.ts'
@@ -19,6 +20,9 @@ const TRACKER_DEFAULTS: TrackerOptions = { minHits: 2, maxMisses: 5, minCutoff: 
 
 let pipeline: HandPipeline | null = null
 let gpu = false
+/** Set on Firefox with WebGPU: the device to kick while a readback is pending (see firefoxPoll.ts). */
+let pollDevice: SubmitQueue | null = null
+const polled = <T>(work: Promise<T>): Promise<T> => (pollDevice ? withCompletionPoll(work, pollDevice) : work)
 // A HandPipeline method that is awaiting (a frame) holds the object: a config change waits for the next frame.
 let confThreshold = 0.4
 let appliedConf = confThreshold
@@ -27,6 +31,7 @@ let ctx: OffscreenCanvasRenderingContext2D | null = null
 async function init_(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
   confThreshold = appliedConf = msg.confThreshold
   await init()
+  const firefox = isFirefox(navigator.userAgent)
   const hasGpu = msg.backend !== 'wasm' && (await webgpuAvailable())
   const pick = (dflt: Precision): Precision => (msg.precision === 'auto' ? dflt : msg.precision)
   const attempts: [Backend, Precision][] = hasGpu
@@ -42,8 +47,9 @@ async function init_(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
     try {
       bytes[precision] ??= await fetchModel(msg.urls[precision], post)
       const p = await HandPipeline.create(RUNTIME[backend], bytes[precision], msg.confThreshold)
-      await p.warm_up() // compiles shaders, allocates
-      const ms = await p.warm_up()
+      pollDevice = backend === 'webgpu' && firefox ? (HandPipeline.device() as SubmitQueue | null) : null
+      await polled(p.warm_up()) // compiles shaders, allocates
+      const ms = await polled(p.warm_up())
       notes.push(`${backend}/${precision}: ${ms.toFixed(0)} ms`)
       if (!best || ms < best.ms) {
         best?.p.free()
@@ -59,6 +65,8 @@ async function init_(msg: Extract<ToWorker, { type: 'init' }>): Promise<void> {
   }
   pipeline = best.p
   gpu = best.backend === 'webgpu'
+  if (!gpu) pollDevice = null
+  else if (firefox) pollDevice = HandPipeline.device() as SubmitQueue | null
   const t = { ...TRACKER_DEFAULTS, ...msg.tracker }
   pipeline.set_tracker(t.minHits, t.maxMisses, t.minCutoff, t.beta)
   post({ type: 'ready', backend: best.backend, precision: best.precision, threads: best.backend === 'wasm' ? 1 : 0, note: notes.join('; ') })
@@ -82,7 +90,7 @@ async function frame(msg: Extract<ToWorker, { type: 'frame' }>): Promise<void> {
   let t1: number
   if (gpu) {
     t1 = performance.now()
-    packed = await pipeline.run_canvas(ctx.canvas, bw, bh, srcScale, msg.srcW, msg.mirror, msg.t)
+    packed = await polled(pipeline.run_canvas(ctx.canvas, bw, bh, srcScale, msg.srcW, msg.mirror, msg.t))
   } else {
     const rgba = ctx.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE).data
     t1 = performance.now()

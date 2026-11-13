@@ -132,15 +132,14 @@ impl Pipeline {
 
     async fn infer(&self, input: Tensor) -> Result<RawHead> {
         let outputs = self.runnable.run([input])?;
-        ensure!(outputs.len() == 3, "The cut model has {} outputs, expected 3", outputs.len());
-        // wgpu outputs stay on the GPU until downloaded; a browser cannot block on that.
-        let mut host = Vec::with_capacity(3);
-        for o in &outputs {
-            // The fp16 model's head is f16 up to the cut.
-            let o = o.to_host_async().await?.convert_to(DatumType::F32)?;
-            host.push(o.as_slice::<f32>()?.to_vec());
-        }
-        let [boxes, scores, kpts]: [Vec<f32>; 3] = host.try_into().map_err(|_| anyhow::anyhow!("three outputs"))?;
+        let [boxes, scores, kpts] = outputs.as_slice() else {
+            anyhow::bail!("The cut model has {} outputs, expected 3", outputs.len());
+        };
+        // wgpu outputs stay on the GPU until downloaded, and a browser cannot block on that. The three
+        // downloads run at once: each waits for the GPU to finish, and on Firefox that wait ends on a timer
+        // tick (see firefoxPoll.ts), so in turn they would cost three ticks.
+        let (boxes, scores, kpts) =
+            futures_util::future::try_join3(host_f32(boxes), host_f32(scores), host_f32(kpts)).await?;
         let anchors = scores.len();
         ensure!(
             boxes.len() == 4 * anchors && kpts.len() == 3 * NUM_KP * anchors,
@@ -168,4 +167,10 @@ impl Pipeline {
         }
         v
     }
+}
+
+/// A tensor's values on the host as f32, downloaded from the GPU if needed. The fp16 model's head is f16.
+async fn host_f32(t: &Tensor) -> Result<Vec<f32>> {
+    let host = t.to_host_async().await?.convert_to(DatumType::F32)?;
+    Ok(host.as_slice::<f32>()?.to_vec())
 }
