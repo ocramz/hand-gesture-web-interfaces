@@ -1,4 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src", "tests", "vite.ts"]
+  "compilerOptions": {
+    // No vite/client: the library must not depend on any bundler's types.
+    "types": ["node"]
+  },
+  "include": ["src", "tests"]
 }

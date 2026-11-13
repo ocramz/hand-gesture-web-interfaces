@@ -1,7 +1,7 @@
 // A ring through three fingertips: the circle through their rays' intersections with a chosen plane.
 // Tested in tests/ring.test.ts.
 import { Vector3 } from 'three'
-import { circumcircle, raysOnPlane } from '@ocramz/handpose'
+import { circumcircle, raysOnPlane, type Vec3 } from '@ocramz/handpose'
 
 export interface Ring {
   center: Vector3
@@ -33,7 +33,7 @@ const smoothstep = (a: number, b: number, x: number) => {
  * tips are nearly collinear the circumcircle explodes, so it blends toward a circle around their
  * centroid.
  */
-export function fitRing(rays: readonly [Vector3, Vector3, Vector3], anchor: Vector3, n: Vector3, limits: RingLimits, ring: Ring): boolean {
+export function fitRing(rays: readonly [Vec3, Vec3, Vec3], anchor: Vec3, n: Vec3, limits: RingLimits, ring: Ring): boolean {
   ring.valid = false
   if (!raysOnPlane(rays, anchor, n, ring.tips)) return false
   const [a, b, c] = ring.tips

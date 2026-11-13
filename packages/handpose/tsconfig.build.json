@@ -1,0 +1,15 @@
+{
+  // Emits dist/ file for file (no bundling), so the worker, wasm and model URLs stay relative and valid.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"]
+}

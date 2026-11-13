@@ -2,8 +2,15 @@
 
 Hand pose from the webcam, in the browser: a YOLO26 hand-pose model in onnxruntime-web or in
 [tract](https://github.com/sonos/tract) compiled to wasm (in a worker), two stable tracked hands, and their
-keypoints lifted to 3D camera space. Plus a three.js stage that shows
-the camera frame with a matched 3D camera, so anything placed at a hand's 3D position lands on its pixels.
+keypoints lifted to 3D camera space. Prebuilt: compiled JS + types, the tract wasm and the model weights are
+all in the package. No rendering framework: `three` or anything else is up to the app (a three.js `Vector3`
+can be passed wherever the API takes a `Vec3`).
+
+```sh
+npm install @ocramz/handpose
+```
+
+**License: AGPL-3.0-only. The bundled weights are non-commercial** (see [Model](#model) and `NOTICE.md`).
 
 Chrome or Safari with WebGPU: the model runs on the GPU (fp16). Without usable WebGPU it falls back to
 multithreaded WASM (fp32), at a few frames per second.
@@ -42,32 +49,57 @@ cargo install wasm-bindgen-cli --version 0.2.128 --locked
 
 ## Use
 
+Needs an ESM bundler that understands `new URL('…', import.meta.url)` and module workers (Vite, webpack 5,
+…): the package finds its workers, the tract `.wasm` and the `.onnx` weights that way, and the bundler emits
+them as assets. With Vite:
+
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
-import { handpose } from '@ocramz/handpose/vite'
-export default defineConfig({ plugins: [handpose()] })
-```
 
-The plugin turns on cross-origin isolation (threaded WASM), keeps onnxruntime-web out of pre-bundling, and
-serves the model weights at `<base>models/` and the sample images at `<base>samples/` (copied into the build).
+// Cross-origin isolation lets onnxruntime-web's WASM backend use threads (SharedArrayBuffer).
+const isolation = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' }
 
-```ts
-import { HandPose, KP, openWebcam, Stage } from '@ocramz/handpose'
-
-const source = await openWebcam() // or openImage('/samples/two_hands.jpg')
-const stage = new Stage({ canvas, overlay, source, mirror: true, hfovDeg: 60 })
-const pose = new HandPose({ onFatal: console.error })
-let last = performance.now() / 1000
-stage.renderer.setAnimationLoop(() => {
-  const now = performance.now() / 1000
-  const dt = Math.min(0.1, now - last)
-  last = now
-  pose.pump(now, source, true) // feeds the model when it is idle
-  pose.updateViews(dt, stage.cam) // pose.views[0|1]: active, kp (pixels), depth, rays, point(k, out)
-  stage.render()
+export default defineConfig({
+  server: { headers: isolation },
+  preview: { headers: isolation },
+  // Pre-bundling would move the modules away from the files they locate through import.meta.url.
+  optimizeDeps: { exclude: ['@ocramz/handpose', 'onnxruntime-web'] },
+  worker: { format: 'es' },
 })
 ```
+
+Serve the same two headers in production for threaded WASM (without them it runs on one thread).
+
+```ts
+import { CameraModel, HandPose, KP, openWebcam, vec3 } from '@ocramz/handpose'
+
+const source = await openWebcam() // or openImage(url)
+const cam = new CameraModel()
+cam.set(source.width, source.height, 60 /* webcam horizontal fov, degrees */, true /* mirror */)
+const pose = new HandPose({ engine: 'ort', onFatal: console.error }) // or engine: 'tract'
+const tip = vec3()
+let last = performance.now() / 1000
+function frame() {
+  const now = performance.now() / 1000
+  pose.pump(now, source, true) // feeds the model when it is idle
+  pose.updateViews(Math.min(0.1, now - last), cam)
+  last = now
+  for (const hand of pose.views) {
+    if (hand.active) hand.point(KP.indexTip, tip) // metres, camera space: x right, y up, looking down −z
+  }
+  requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame)
+```
+
+`pose.views[0|1]`: `active`, `presence`, `kp` (smoothed keypoints, source pixels), `depth`, `rays`,
+`point(k, out)`. `pose.raw`: the latest detections. `pose.statusLine()`: backend, model time, pose rate.
+`drawDebug(ctx, cam, pose.raw, pose.views, dpr)` draws them on a 2D canvas.
+
+The weights default to the copies in the package. To host them elsewhere (a CDN), copy
+`@ocramz/handpose/models/yolo26_hand_pose_{fp16,fp32}.onnx` there and pass
+`new HandPose({ modelUrls: { fp16, fp32 } })`.
 
 | Piece | Where |
 |---|---|
@@ -77,9 +109,10 @@ stage.renderer.setAnimationLoop(() => {
 | Keypoint order repair (see below) | `canonicalize` in `src/pose/decode.ts` |
 | Two stable hand slots, hysteresis, One-Euro smoothing | `src/pose/tracker.ts`, `src/hands.ts` |
 | Webcam / still-image frame sources | `src/source.ts` |
-| Pinhole camera, cover-fit to the canvas | `src/camera.ts` |
+| Pinhole camera, cover-fit to a canvas | `src/camera.ts` |
 | 2D → 3D: hand depth from palm size; rays onto a plane through the hand | `src/lift.ts` |
-| three.js stage: renderer, video background, matched camera, debug overlay | `src/stage.ts`, `src/render/` |
+| Debug overlay (2D canvas) | `src/render/debugOverlay.ts` |
+| Minimal `{x, y, z}` vector helpers | `src/vec3.ts` |
 
 **Depth.** The model gives 2D keypoints only. A hand's distance comes from its apparent palm size
 (`handDepth`); the camera's horizontal fov and a hand-size factor calibrate it. Points a shape needs are put
@@ -95,15 +128,23 @@ whichever reading gives the shorter skeleton.
 
 ## Model
 
-`npm run fetch-model` downloads the weights (21 MB fp16 + 43 MB fp32) into `assets/models/` if missing.
-They are [poptoz/yolo26-hand-pose-face-detection](https://huggingface.co/poptoz/yolo26-hand-pose-face-detection):
+The package includes the weights (21 MB fp16 for WebGPU + 43 MB fp32 for WASM, in `assets/models/`):
+[poptoz/yolo26-hand-pose-face-detection](https://huggingface.co/poptoz/yolo26-hand-pose-face-detection):
 YOLO26s-pose (Ultralytics, AGPL-3.0) fine-tuned on Ultralytics Hand Keypoints (CC BY-NC-SA 4.0). Use them
-non-commercially. `assets/samples/two_hands.jpg` is the public-domain Wikimedia Commons photo
+non-commercially. In this repo `npm run fetch-model` re-downloads them if missing.
+`assets/samples/two_hands.jpg` (repo only, not published) is the public-domain Wikimedia Commons photo
 "Two hand, ten fingers.jpg"; `hands_apart.jpg` is cut from it.
+
+## Building from source
+
+`npm run build` (here or at the repo root) builds the tract wasm (`build:wasm`) and compiles `src/` into
+`dist/` (`build:ts`, plain `tsc`, file for file, so the worker, wasm and model URLs stay relative). The apps
+in this repo import the built `dist/` like any npm user; run `npm run watch` while changing the library.
 
 ## Checks
 
 ```sh
 npm test            # decode, lift, tracker (TS); then cargo test: the Rust ports and the real model on the samples
-npm run typecheck   # from the repo root, which builds the wasm bindings it type-checks against
+npm run typecheck   # from the repo root, which builds the package first
+bash test-consumer/run-smoke.sh <ocramz-handpose-X.Y.Z.tgz>   # the packed tarball in a fresh Vite app, both engines, headless Chromium
 ```

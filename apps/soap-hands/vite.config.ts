@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import { handpose } from '@ocramz/handpose/vite'
+import { handpose } from '@ocramz/handpose-three/vite'
 
 export default defineConfig({
   plugins: [handpose()],

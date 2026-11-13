@@ -8,18 +8,21 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run build:wasm -w @ocramz/handpose && npm run dev -w @ocramz/soap-hands",
-    "dev:tract": "npm run build:wasm -w @ocramz/handpose && npm run dev -w @ocramz/tract-hands",
-    "build": "npm run build:wasm -w @ocramz/handpose && npm run build --workspaces --if-present",
+    "dev": "npm run build -w @ocramz/handpose && npm run dev -w @ocramz/soap-hands",
+    "dev:tract": "npm run build -w @ocramz/handpose && npm run dev -w @ocramz/tract-hands",
+    "watch": "npm run watch -w @ocramz/handpose",
+    "build": "npm run build -w @ocramz/handpose && npm run build -w @ocramz/soap-hands -w @ocramz/tract-hands",
     "build:wasm": "npm run build:wasm -w @ocramz/handpose",
-    "test": "npm test --workspaces",
-    "typecheck": "npm run build:wasm -w @ocramz/handpose && npm run typecheck --workspaces",
-    "fetch-model": "npm run fetch-model -w @ocramz/handpose"
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run build -w @ocramz/handpose && npm run typecheck --workspaces",
+    "fetch-model": "npm run fetch-model -w @ocramz/handpose",
+    "pack:handpose": "npm pack -w @ocramz/handpose"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/three": "0.186.0",
     "typescript": "7.0.2",
     "vite": "8.3.4"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }
