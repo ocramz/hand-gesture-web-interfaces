@@ -1,0 +1,21 @@
+{
+  "name": "@ocramz/handpose",
+  "version": "0.1.0",
+  "private": true,
+  "author": "ocramz",
+  "description": "Webcam hand pose in the browser: YOLO26 in onnxruntime-web (worker), tracking, 2D → 3D lifting.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./vite.ts"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "fetch-model": "bash scripts/fetch-model.sh"
+  },
+  "dependencies": {
+    "onnxruntime-web": "1.31.1",
+    "three": "0.186.1"
+  }
+}

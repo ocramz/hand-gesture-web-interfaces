@@ -1,8 +1,7 @@
 import { MeshBasicMaterial, Mesh, SphereGeometry, type Vector3 } from 'three'
+import type { Finger, HandView } from '@ocramz/handpose'
 import type { Bubbles } from '../render/bubbles.ts'
 import type { Droplets } from '../render/droplets.ts'
-import type { HandView } from '../hands.ts'
-import type { Finger } from '../pose/types.ts'
 
 export interface ShapeParams {
   fingers: [Finger, Finger, Finger]

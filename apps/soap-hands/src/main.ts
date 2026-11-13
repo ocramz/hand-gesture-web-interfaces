@@ -3,21 +3,15 @@
 //
 // URL parameters: ?image=/samples/two_hands.jpg (a still image instead of the webcam), mirror=0|1,
 // backend=webgpu|wasm, precision=fp16|fp32, mode=rings|saddle, debug=1, gui=0.
-import { NoToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer, type Mesh } from 'three'
+import { Vector3, type Mesh } from 'three'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
-import { CameraModel } from './geom/camera.ts'
-import { HandView, updateHandViews } from './hands.ts'
+import { HandPose, openImage, openWebcam, Stage, type Backend, type Finger, type FrameSource, type Precision } from '@ocramz/handpose'
 import type { ShapeParams, Shape } from './modes/common.ts'
 import { RingMode } from './modes/ringMode.ts'
 import { SaddleMode } from './modes/saddleMode.ts'
-import { HandTracker } from './pose/tracker.ts'
-import type { Finger, FromWorker, Hand, ToWorker } from './pose/types.ts'
-import { createBackground } from './render/background.ts'
 import { Bubbles } from './render/bubbles.ts'
-import { clearOverlay, drawDebug } from './render/debugOverlay.ts'
 import { Droplets } from './render/droplets.ts'
 import { sharedFilmUniforms } from './render/filmMaterial.ts'
-import { openImage, openWebcam, type FrameSource } from './source.ts'
 
 const query = new URLSearchParams(location.search)
 
@@ -63,15 +57,6 @@ async function openSource(): Promise<FrameSource> {
 }
 
 async function main(): Promise<void> {
-  const canvas = $<HTMLCanvasElement>('gl')
-  const overlay = $<HTMLCanvasElement>('overlay')
-  const octx = overlay.getContext('2d') as CanvasRenderingContext2D
-  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-  renderer.toneMapping = NoToneMapping
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-  const scene = new Scene()
-  const camera = new PerspectiveCamera(50, 1, 0.01, 20)
-
   statusEl.textContent = 'opening camera…'
   let source: FrameSource
   try {
@@ -81,17 +66,16 @@ async function main(): Promise<void> {
     return
   }
   const mirror = query.has('mirror') ? query.get('mirror') !== '0' : source.kind === 'webcam'
-  const cam = new CameraModel()
-  cam.set(source.width, source.height, params.cameraFov, mirror)
+  const stage = new Stage({ canvas: $<HTMLCanvasElement>('gl'), overlay: $<HTMLCanvasElement>('overlay'), source, mirror, hfovDeg: params.cameraFov })
+  const { scene, background } = stage
 
   const shared = sharedFilmUniforms()
   shared.uVideo.value = source.texture
   shared.uMirror.value = mirror ? 1 : 0
-  const background = createBackground(source.texture)
-  scene.add(background.mesh)
 
   const droplets = new Droplets()
   scene.add(droplets.points)
+  stage.onResize(fit => droplets.setScale(((fit.height / 2) * fit.dpr) / Math.tan((fit.fovDeg * Math.PI) / 360)))
   const bubbles = new Bubbles(shared, droplets, (m: Mesh) => scene.add(m), (m: Mesh) => scene.remove(m))
   const fx = { droplets, bubbles }
   const ringMode = new RingMode(shared)
@@ -101,88 +85,16 @@ async function main(): Promise<void> {
   const applyMode = () => { for (const [k, s] of Object.entries(shapes)) s.setEnabled(k === params.mode) }
   applyMode()
 
-  function resize(): void {
-    const w = innerWidth
-    const h = innerHeight
-    renderer.setSize(w, h, false)
-    const dpr = renderer.getPixelRatio()
-    overlay.width = Math.round(w * dpr)
-    overlay.height = Math.round(h * dpr)
-    cam.set(source.width, source.height, params.cameraFov, mirror)
-    const fit = cam.coverFit(w, h)
-    camera.fov = fit.fovDeg
-    camera.aspect = w / h
-    camera.updateProjectionMatrix()
-    background.setFit(fit.uvScale, mirror)
-    droplets.setScale(((h / 2) * dpr) / Math.tan((fit.fovDeg * Math.PI) / 360))
-  }
-  addEventListener('resize', resize)
-  resize()
-
-  // Hand pose worker.
-  const tracker = new HandTracker()
-  const views: [HandView, HandView] = [new HandView(), new HandView()]
-  let raw: Hand[] = []
-  let ready = false
-  let busy = false
-  let backendLabel = ''
-  let inferMs = 0
-  let poseHz = 0
-  let lastResult = 0
-  const counts = { sent: 0, results: 0, errors: 0, lastError: '' }
-  const worker = new Worker(new URL('./pose/worker.ts', import.meta.url), { type: 'module' })
-  const send = (m: ToWorker, transfer: Transferable[] = []) => worker.postMessage(m, transfer)
-  worker.onmessage = (e: MessageEvent<FromWorker>) => {
-    const m = e.data
-    if (m.type === 'progress') {
-      statusEl.textContent = `loading ${m.file} ${m.total ? Math.round((100 * m.loaded) / m.total) + '%' : (m.loaded / 1e6).toFixed(0) + ' MB'}`
-    } else if (m.type === 'ready') {
-      ready = true
-      backendLabel = `${m.backend} ${m.precision}${m.threads ? ` ×${m.threads}` : ''}`
-      if (m.note) console.info('[soap-hands]', m.note)
-      if (m.backend === 'wasm' && query.get('backend') !== 'wasm') backendLabel += ' (no usable WebGPU: slow)'
-    } else if (m.type === 'error') {
-      if (!ready) fail(`The hand model could not run:\n${m.message}`)
-      else console.error('[soap-hands]', m.message)
-      counts.errors++
-      counts.lastError = m.message
-      busy = false
-    } else if (m.type === 'result') {
-      counts.results++
-      busy = false
-      raw = m.hands
-      inferMs += 0.2 * (m.inferMs + m.prepMs - inferMs)
-      const now = performance.now() / 1000
-      if (lastResult) poseHz += 0.2 * (1 / Math.max(1e-3, now - lastResult) - poseHz)
-      lastResult = now
-      tracker.update(m.hands, m.t, source.width, mirror)
-    }
-  }
-  worker.onerror = e => fail(`Worker error: ${e.message}`)
-  const base = new URL(import.meta.env.BASE_URL, location.href)
-  send({
-    type: 'init',
-    urls: { fp16: new URL('models/yolo26_hand_pose_fp16.onnx', base).href, fp32: new URL('models/yolo26_hand_pose_fp32.onnx', base).href },
-    backend: (query.get('backend') as 'webgpu' | 'wasm' | null) ?? 'auto',
-    precision: (query.get('precision') as 'fp16' | 'fp32' | null) ?? 'auto',
+  // Hand pose.
+  const pose = new HandPose({
+    backend: (query.get('backend') as Backend | null) ?? 'auto',
+    precision: (query.get('precision') as Precision | null) ?? 'auto',
     confThreshold: params.confidence,
+    onProgress: m => { statusEl.textContent = m },
+    onFatal: fail,
   })
+  const { views } = pose
   statusEl.textContent = 'loading model…'
-
-  function pump(now: number): void {
-    if (!ready || busy || !source.hasNewFrame(now)) return
-    busy = true
-    source.grab(640)
-      .then(bitmap => {
-        counts.sent++
-        send({ type: 'frame', bitmap, srcW: source.width, srcH: source.height, t: performance.now() / 1000 }, [bitmap])
-      })
-      .catch(e => {
-        counts.errors++
-        counts.lastError = String(e)
-        busy = false
-      })
-  }
 
   // Controls.
   if (query.get('gui') !== '0') {
@@ -201,9 +113,9 @@ async function main(): Promise<void> {
     film.add(params, 'thickness', 0.4, 2, 0.01)
     film.add(params, 'backgroundDim', 0.2, 1, 0.01).name('background')
     const camFolder = gui.addFolder('Camera & tracking')
-    camFolder.add(params, 'cameraFov', 35, 100, 1).name('webcam h-fov°').onChange(resize)
+    camFolder.add(params, 'cameraFov', 35, 100, 1).name('webcam h-fov°').onChange((v: number) => stage.setFov(v))
     camFolder.add(params, 'handSize', 0.7, 1.4, 0.01).name('hand size')
-    camFolder.add(params, 'confidence', 0.15, 0.85, 0.01).onChange((v: number) => send({ type: 'config', confThreshold: v }))
+    camFolder.add(params, 'confidence', 0.15, 0.85, 0.01).onChange((v: number) => pose.setConfidence(v))
     camFolder.add(params, 'debug').name('debug overlay').listen()
     camFolder.close()
     if (innerWidth < 700) gui.close()
@@ -217,7 +129,7 @@ async function main(): Promise<void> {
   })
 
   // Exposed for poking at from the console and for automated checks.
-  const debugState = { ringMode, saddleMode, views, tracker, params, counts, get raw() { return raw }, get ready() { return ready }, get busy() { return busy }, get backend() { return backendLabel } }
+  const debugState = { ringMode, saddleMode, views, pose, tracker: pose.tracker, params, counts: pose.counts, get raw() { return pose.raw }, get ready() { return pose.ready }, get busy() { return pose.busy }, get backend() { return pose.backendLabel } }
   ;(window as unknown as { soap: typeof debugState }).soap = debugState
 
   let last = performance.now() / 1000
@@ -225,12 +137,12 @@ async function main(): Promise<void> {
   let statusAt = 0
   let filmSeen = false
   const pokers: Vector3[] = []
-  renderer.setAnimationLoop(() => {
+  stage.renderer.setAnimationLoop(() => {
     const now = performance.now() / 1000
     const dt = Math.min(0.1, now - last)
     last = now
     fps += 0.05 * (1 / Math.max(1e-3, dt) - fps)
-    pump(now)
+    pose.pump(now, source, mirror)
 
     shared.uTime.value = now
     shared.uIntensity.value = params.intensity
@@ -238,7 +150,7 @@ async function main(): Promise<void> {
     shared.uThickness.value = params.thickness
     background.setDim(params.backgroundDim)
 
-    updateHandViews(views, tracker, cam, dt, params.handSize)
+    pose.updateViews(dt, stage.cam, params.handSize)
     const shapeParams: ShapeParams = {
       fingers: FINGER_SETS[params.fingers],
       tilt: params.tilt,
@@ -254,10 +166,8 @@ async function main(): Promise<void> {
     bubbles.update(dt, now, pokers)
     droplets.update(dt)
 
-    renderer.render(scene, camera)
-
-    if (params.debug) drawDebug(octx, cam, raw, views, renderer.getPixelRatio())
-    else clearOverlay(octx)
+    stage.render()
+    stage.drawDebug(params.debug ? pose.raw : null, views)
 
     if (!filmSeen && ringMode.state === 'film') {
       filmSeen = true
@@ -265,9 +175,9 @@ async function main(): Promise<void> {
     }
     if (now - statusAt > 0.25) {
       statusAt = now
-      if (ready) {
+      if (pose.ready) {
         const hands = views.filter(v => v.active).length
-        statusEl.textContent = `${backendLabel} · ${inferMs.toFixed(0)} ms · pose ${poseHz.toFixed(0)} Hz · ${fps.toFixed(0)} fps\n${hands} hand${hands === 1 ? '' : 's'} · ${shape.label}`
+        statusEl.textContent = `${pose.statusLine()} · ${fps.toFixed(0)} fps\n${hands} hand${hands === 1 ? '' : 's'} · ${shape.label}`
       }
     }
   })

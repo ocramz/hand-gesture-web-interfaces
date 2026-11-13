@@ -1,18 +1,18 @@
 {
-  "name": "soap-hands",
+  "name": "hand-gesture-web-interfaces",
   "private": true,
+  "author": "ocramz",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "fetch-model": "bash scripts/fetch-model.sh",
-    "test": "node tests/decode.test.ts && node tests/lift.test.ts && node tests/catenoid.test.ts && node tests/relax.test.ts && node tests/tracker.test.ts && node tests/ringMode.test.ts"
-  },
-  "dependencies": {
-    "onnxruntime-web": "1.31.1",
-    "three": "0.186.1"
+    "dev": "npm run dev -w @ocramz/soap-hands",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm test --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "fetch-model": "npm run fetch-model -w @ocramz/handpose"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

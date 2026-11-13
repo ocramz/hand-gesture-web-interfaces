@@ -1,5 +1,5 @@
 // 2D overlay: raw detections (boxes, skeletons, confidence) and the tracked hands, in canvas pixels.
-import type { CameraModel } from '../geom/camera.ts'
+import type { CameraModel } from '../camera.ts'
 import type { HandView } from '../hands.ts'
 import { SKELETON, TIP, type Hand } from '../pose/types.ts'
 

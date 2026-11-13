@@ -12,6 +12,5 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "erasableSyntaxOnly": true
-  },
-  "include": ["src", "tests", "vite.config.ts"]
+  }
 }
