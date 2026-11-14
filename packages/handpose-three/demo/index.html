@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>handpose-three demo</title>
+    <meta name="description" content="Webcam hand tracking in the browser, with 3D markers pinned to your hands: @ocramz/handpose and three.js." />
+    <style>
+      html, body { margin: 0; height: 100%; background: #07080a; overflow: hidden; }
+      body { font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif; color: #dfe6ee; }
+      canvas { display: block; }
+      #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+      #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+      #status { position: fixed; left: 12px; bottom: 12px; max-width: calc(100vw - 48px); padding: 6px 10px;
+        border-radius: 6px; background: rgba(8, 10, 14, 0.6); backdrop-filter: blur(6px);
+        font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+      #error { position: fixed; inset: 0; z-index: 1; display: none; align-items: center; justify-content: center;
+        padding: 24px; text-align: center; white-space: pre-wrap; background: rgba(7, 8, 10, 0.85); }
+      #error.shown { display: flex; }
+
+      #panel { position: fixed; top: 12px; right: 12px; z-index: 2; box-sizing: border-box;
+        width: min(310px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 8px 12px;
+        border-radius: 8px; background: rgba(8, 10, 14, 0.72); backdrop-filter: blur(8px); }
+      #panel summary { cursor: pointer; font-weight: 600; }
+      #panel h2 { margin: 12px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+        text-transform: uppercase; color: #8b97a6; }
+      .row { display: grid; grid-template-columns: 6.5em 1fr 3.2em; align-items: center; gap: 8px; }
+      .check { display: flex; align-items: center; gap: 6px; }
+      #panel code { display: block; margin: 2px 0 8px; font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #8fd3ff; }
+      #panel input, #panel select { accent-color: #5adcff; }
+      #panel select { padding: 2px 4px; border: 1px solid #2a323d; border-radius: 4px; background: #11151b;
+        color: inherit; font: inherit; }
+      #panel input[type='range'] { width: 100%; min-width: 0; }
+      #panel output { text-align: right; font-variant-numeric: tabular-nums; }
+      #panel p { margin: 10px 0 2px; font-size: 12px; color: #8b97a6; }
+      #panel a { color: #8fd3ff; }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+
+    <details id="panel">
+      <summary>handpose-three</summary>
+
+      <h2>Live</h2>
+      <label class="row"><span>Camera fov</span><input id="fov" type="range" min="40" max="100" step="1" /><output id="fov-out"></output></label>
+      <code>stage.setFov(hfovDeg)</code>
+      <label class="row"><span>Background</span><input id="dim" type="range" min="0" max="1" step="0.05" /><output id="dim-out"></output></label>
+      <code>stage.background.setDim(d)</code>
+      <label class="check"><input id="debug" type="checkbox" /> Debug overlay (D)</label>
+      <code>stage.drawDebug(pose.raw, pose.views)</code>
+
+      <h2>Reloads the page</h2>
+      <label class="row"><span>Source</span>
+        <select id="source">
+          <option value="">Webcam</option>
+          <option value="samples/two_hands.jpg">Sample photo</option>
+        </select><span></span>
+      </label>
+      <code>openWebcam() · openImage(url)</code>
+      <label class="check"><input id="mirror" type="checkbox" /> Mirror</label>
+      <code>new Stage({ mirror })</code>
+      <label class="row"><span>Engine</span>
+        <select id="engine">
+          <option value="ort">ort (onnxruntime-web)</option>
+          <option value="tract">tract (wasm)</option>
+        </select><span></span>
+      </label>
+      <label class="row"><span>Backend</span>
+        <select id="backend">
+          <option value="auto">auto</option>
+          <option value="webgpu">webgpu</option>
+          <option value="wasm">wasm</option>
+        </select><span></span>
+      </label>
+      <code>new HandPose({ engine, backend })</code>
+
+      <p>The markers sit on your hands' keypoints in 3D, sized in metres. Set the fov to your webcam's
+        horizontal field of view: it calibrates their depth, and they stay on their pixels whatever it is.
+        Bring thumb and index together to pinch.</p>
+      <p>Code: <a href="https://github.com/ocramz/hand-gesture-web-interfaces">hand-gesture-web-interfaces</a>
+        (AGPL-3.0), <a href="https://www.npmjs.com/package/@ocramz/handpose">@ocramz/handpose</a>. The hand-pose
+        weights are for non-commercial use only
+        (<a href="https://github.com/ocramz/hand-gesture-web-interfaces/blob/main/packages/handpose/NOTICE.md">notice</a>).</p>
+    </details>
+
+    <div id="status">starting…</div>
+    <div id="error"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

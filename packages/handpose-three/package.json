@@ -11,7 +11,10 @@
     "./vite": "./vite.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo": "vite demo",
+    "demo:build": "vite build demo",
+    "demo:preview": "vite preview demo"
   },
   "dependencies": {
     "@ocramz/handpose": "*",

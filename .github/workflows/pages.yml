@@ -1,0 +1,77 @@
+# Builds the @ocramz/handpose-three demo (packages/handpose-three/demo) into one static folder and publishes
+# it on GitHub Pages, on pushes to main. Kept out of ci.yml: release.yml calls ci.yml as a reusable workflow,
+# and a nested job asking for pages: write would make that call fail. (ci.yml builds the demo too, via the
+# root `npm run build`, so a PR that breaks it fails there first.)
+#
+# One-time setup: Settings → Pages → Source: GitHub Actions (see the root README).
+name: Demo (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits for the running one instead of cancelling it mid-deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # The tract engine's wasm, built exactly as in ci.yml.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/handpose/tract
+
+      # The wasm-bindgen CLI must be exactly the version tract/Cargo.lock pins (scripts/build-wasm.sh checks).
+      - name: Read the pinned wasm-bindgen version
+        id: wb
+        run: |
+          v=$(grep -A1 '^name = "wasm-bindgen"$' packages/handpose/tract/Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@${{ steps.wb.outputs.version }}
+
+      - run: npm ci
+
+      - name: Build @ocramz/handpose (tract wasm, dist)
+        run: npm run build -w @ocramz/handpose
+
+      - name: Build the demo
+        run: npm run demo:build -w @ocramz/handpose-three
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: packages/handpose-three/demo/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

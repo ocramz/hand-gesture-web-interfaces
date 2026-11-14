@@ -10,8 +10,9 @@
   "scripts": {
     "dev": "npm run build -w @ocramz/handpose && npm run dev -w @ocramz/soap-hands",
     "dev:tract": "npm run build -w @ocramz/handpose && npm run dev -w @ocramz/tract-hands",
+    "demo": "npm run build -w @ocramz/handpose && npm run demo -w @ocramz/handpose-three",
     "watch": "npm run watch -w @ocramz/handpose",
-    "build": "npm run build -w @ocramz/handpose && npm run build -w @ocramz/soap-hands -w @ocramz/tract-hands",
+    "build": "npm run build -w @ocramz/handpose && npm run build -w @ocramz/soap-hands -w @ocramz/tract-hands && npm run demo:build -w @ocramz/handpose-three",
     "build:wasm": "npm run build:wasm -w @ocramz/handpose",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run build -w @ocramz/handpose && npm run typecheck --workspaces",
