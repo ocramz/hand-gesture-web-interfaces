@@ -31,7 +31,8 @@ stage.renderer.setAnimationLoop(() => {
 ## Demo
 
 [`demo/`](demo) is a tour of this package that builds to one static folder: 3D markers pinned to the
-tracked hands (sized in metres, placed with `HandView.point`), and a panel that drives the API.
+tracked hands (sized in metres, placed with `HandView.point`), and a panel that drives the API. It runs on
+the webcam, mirrored, with a 60° horizontal fov.
 
 ```sh
 npm run demo                                  # from the repo root: builds @ocramz/handpose, then http://localhost:5173
@@ -43,14 +44,12 @@ It is published at https://ocramz.github.io/hand-gesture-web-interfaces/ by `.gi
 
 | Panel | API |
 |---|---|
-| Camera fov | `stage.setFov(hfovDeg)`: live. It calibrates the depth; the markers stay on their pixels at any fov |
 | Background | `stage.background.setDim(d)`: live |
-| Debug overlay (`D`) | `stage.drawDebug(pose.raw, pose.views)`: the same keypoints in 2D, on top of the 3D markers |
-| Source, mirror | `openWebcam()` / `openImage(url)`, `new Stage({ mirror })`: reload the page |
+| Debug overlay (`D`) | the raw detections (`pose.raw`): boxes with their confidence, on top of the 3D markers |
 | Engine, backend | `new HandPose({ engine, backend })`: reload the page |
 
-The panel keeps its settings in the URL: `image=samples/two_hands.jpg` (the sample photo instead of the
-webcam), `mirror=0|1`, `engine=ort|tract`, `backend=auto|webgpu|wasm`, `fov=<degrees>`, `dim=0..1`,
+The panel keeps its settings in the URL: `engine=tract|ort` (default `tract`), `backend=webgpu|auto|wasm`
+(default `webgpu`; it falls back to wasm without a usable WebGPU adapter), `dim=0..1` (default `0.05`),
 `debug=1`.
 
 `dist/` holds everything the page loads: three.js, `@ocramz/handpose`, both workers, the ort and tract

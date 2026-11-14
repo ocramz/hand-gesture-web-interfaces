@@ -1,14 +1,21 @@
-// The @ocramz/handpose-three demo: the Stage API, live. 3D markers sit on the tracked hands' keypoints
-// (HandView.point → camera space → the Stage's matched three.js camera → the pixel the webcam saw), the
-// debug overlay draws the same keypoints in 2D to compare, and the panel drives the rest of the API.
+// The @ocramz/handpose-three demo: the Stage API, live, on the mirrored webcam. 3D markers sit on the
+// tracked hands' keypoints (HandView.point → camera space → the Stage's matched three.js camera → the pixel
+// the webcam saw), the debug overlay draws the model's raw detections (boxes and confidence), and the panel
+// drives the rest of the API.
 //
-// URL parameters (the panel sets them): image=samples/two_hands.jpg (a still image instead of the webcam),
-// mirror=0|1, engine=ort|tract, backend=auto|webgpu|wasm, fov=<degrees>, dim=0..1, debug=0|1.
+// URL parameters (the panel sets them): engine=tract|ort, backend=webgpu|auto|wasm, dim=0..1, debug=0|1.
 import { DirectionalLight, HemisphereLight } from 'three'
-import { HandPose, openImage, openWebcam, type Backend, type Engine, type FrameSource } from '@ocramz/handpose'
+import { HandPose, openWebcam, type Backend, type Engine, type FrameSource } from '@ocramz/handpose'
 import { Stage } from '@ocramz/handpose-three'
 import { crossOriginIsolate } from './isolation.ts'
 import { HandMarkers, PINCH_M } from './markers.ts'
+import { drawBoxes } from './overlay.ts'
+
+/** The webcam's horizontal field of view, degrees: a typical laptop webcam. It only calibrates the depth;
+ * the markers stay on their pixels at any fov. */
+const HFOV_DEG = 60
+const DEFAULT_ENGINE: Engine = 'tract'
+const DEFAULT_BACKEND: Backend = 'webgpu'
 
 const query = new URLSearchParams(location.search)
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -20,15 +27,14 @@ function numberParam(key: string, fallback: number, lo: number, hi: number): num
   return query.has(key) && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback
 }
 
-const image = query.get('image')
-const engine: Engine = query.get('engine') === 'tract' ? 'tract' : 'ort'
+const engine: Engine = query.get('engine') === 'ort' ? 'ort' : DEFAULT_ENGINE
 const backendParam = query.get('backend')
-const backend: Backend | 'auto' = backendParam === 'webgpu' || backendParam === 'wasm' ? backendParam : 'auto'
-const fov = numberParam('fov', 60, 40, 100)
-const dim = numberParam('dim', 0.8, 0, 1)
+// webgpu falls back to wasm where there is no usable WebGPU adapter, so it is safe as the default.
+const backend: Backend | 'auto' = backendParam === 'auto' || backendParam === 'wasm' ? backendParam : DEFAULT_BACKEND
+const dim = numberParam('dim', 0.05, 0, 1)
 let debug = query.get('debug') === '1'
 
-/** Writes a URL parameter; `reload` for the ones only a new Stage or HandPose can take. */
+/** Writes a URL parameter; `reload` for the ones only a new HandPose can take. */
 function setParam(key: string, value: string | null, reload: boolean): void {
   if (value === null) query.delete(key)
   else query.set(key, value)
@@ -44,35 +50,17 @@ function fail(message: string): void {
   statusEl.textContent = 'stopped'
 }
 
-/** The controls that reload the page work before (and without) a camera. */
-function bindReloadControls(mirror: boolean): void {
-  const sourceEl = $<HTMLSelectElement>('source')
-  sourceEl.value = image ?? ''
-  sourceEl.onchange = () => {
-    query.delete('mirror') // back to the new source's default
-    setParam('image', sourceEl.value || null, true)
-  }
-  const mirrorEl = $<HTMLInputElement>('mirror')
-  mirrorEl.checked = mirror
-  mirrorEl.onchange = () => setParam('mirror', mirrorEl.checked ? '1' : '0', true)
+/** The controls that reload the page work before (and without) a camera. A default value leaves the URL. */
+function bindReloadControls(): void {
   const engineEl = $<HTMLSelectElement>('engine')
   engineEl.value = engine
-  engineEl.onchange = () => setParam('engine', engineEl.value, true)
+  engineEl.onchange = () => setParam('engine', engineEl.value === DEFAULT_ENGINE ? null : engineEl.value, true)
   const backendEl = $<HTMLSelectElement>('backend')
   backendEl.value = backend
-  backendEl.onchange = () => setParam('backend', backendEl.value === 'auto' ? null : backendEl.value, true)
+  backendEl.onchange = () => setParam('backend', backendEl.value === DEFAULT_BACKEND ? null : backendEl.value, true)
 }
 
 function bindLiveControls(stage: Stage): void {
-  const fovEl = $<HTMLInputElement>('fov')
-  const fovOut = $<HTMLOutputElement>('fov-out')
-  fovEl.value = String(fov)
-  fovOut.value = `${fov}°`
-  fovEl.oninput = () => {
-    stage.setFov(Number(fovEl.value))
-    fovOut.value = `${fovEl.value}°`
-    setParam('fov', fovEl.value, false)
-  }
   const dimEl = $<HTMLInputElement>('dim')
   const dimOut = $<HTMLOutputElement>('dim-out')
   dimEl.value = String(dim)
@@ -99,21 +87,22 @@ const cm = (m: number) => (m * 100).toFixed(0)
 
 async function main(): Promise<void> {
   if (matchMedia('(min-width: 700px)').matches) $<HTMLDetailsElement>('panel').open = true
-  bindReloadControls(query.has('mirror') ? query.get('mirror') !== '0' : !image)
+  bindReloadControls()
   await crossOriginIsolate()
 
-  statusEl.textContent = image ? 'loading image…' : 'opening camera…'
+  statusEl.textContent = 'opening camera…'
   let source: FrameSource
   try {
-    source = image ? await openImage(image) : await openWebcam()
+    source = await openWebcam()
   } catch (e) {
-    const why = e instanceof Error ? e.message : String(e)
-    fail(`Could not open the ${image ? 'image' : 'camera'}:\n${why}${image ? '' : '\n\nPick the sample photo in the panel to try it without a camera.'}`)
+    fail(`Could not open the camera:\n${e instanceof Error ? e.message : String(e)}`)
     return
   }
-  // The webcam is shown as a selfie (mirrored), the photo as it is, unless ?mirror says otherwise.
-  const mirror = query.has('mirror') ? query.get('mirror') !== '0' : source.kind === 'webcam'
-  const stage = new Stage({ canvas: $<HTMLCanvasElement>('gl'), overlay: $<HTMLCanvasElement>('overlay'), source, mirror, hfovDeg: fov })
+  // The webcam is shown as a selfie (mirrored).
+  const overlay = $<HTMLCanvasElement>('overlay')
+  const stage = new Stage({ canvas: $<HTMLCanvasElement>('gl'), overlay, source, mirror: true, hfovDeg: HFOV_DEG })
+  // The same context the Stage holds; the Stage keeps the canvas sized.
+  const octx = overlay.getContext('2d') as CanvasRenderingContext2D
   stage.background.setDim(dim)
   stage.scene.add(new HemisphereLight(0xffffff, 0x404858, 1.6))
   const sun = new DirectionalLight(0xffffff, 1.8)
@@ -135,11 +124,11 @@ async function main(): Promise<void> {
     const dt = Math.min(0.1, now - last)
     last = now
     fps += 0.05 * (1 / Math.max(1e-3, dt) - fps)
-    pose.pump(now, source, mirror)
+    pose.pump(now, source, true)
     pose.updateViews(dt, stage.cam)
     const hands = markers.update(pose.views)
     stage.render()
-    stage.drawDebug(debug ? pose.raw : null, pose.views)
+    drawBoxes(octx, stage.cam, debug ? pose.raw : [], stage.renderer.getPixelRatio())
     if (pose.ready && now - statusAt > 0.25) {
       statusAt = now
       const lines = [`${pose.statusLine()} · ${fps.toFixed(0)} fps`]
