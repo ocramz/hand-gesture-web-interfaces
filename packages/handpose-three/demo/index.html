@@ -45,41 +45,27 @@
       <summary>handpose-three</summary>
 
       <h2>Live</h2>
-      <label class="row"><span>Camera fov</span><input id="fov" type="range" min="40" max="100" step="1" /><output id="fov-out"></output></label>
-      <code>stage.setFov(hfovDeg)</code>
       <label class="row"><span>Background</span><input id="dim" type="range" min="0" max="1" step="0.05" /><output id="dim-out"></output></label>
       <code>stage.background.setDim(d)</code>
       <label class="check"><input id="debug" type="checkbox" /> Debug overlay (D)</label>
-      <code>stage.drawDebug(pose.raw, pose.views)</code>
+      <code>pose.raw[i].box, pose.raw[i].conf</code>
 
       <h2>Reloads the page</h2>
-      <label class="row"><span>Source</span>
-        <select id="source">
-          <option value="">Webcam</option>
-          <option value="samples/two_hands.jpg">Sample photo</option>
-        </select><span></span>
-      </label>
-      <code>openWebcam() · openImage(url)</code>
-      <label class="check"><input id="mirror" type="checkbox" /> Mirror</label>
-      <code>new Stage({ mirror })</code>
       <label class="row"><span>Engine</span>
         <select id="engine">
-          <option value="ort">ort (onnxruntime-web)</option>
           <option value="tract">tract (wasm)</option>
+          <option value="ort">ort (onnxruntime-web)</option>
         </select><span></span>
       </label>
       <label class="row"><span>Backend</span>
         <select id="backend">
-          <option value="auto">auto</option>
           <option value="webgpu">webgpu</option>
+          <option value="auto">auto</option>
           <option value="wasm">wasm</option>
         </select><span></span>
       </label>
       <code>new HandPose({ engine, backend })</code>
 
-      <p>The markers sit on your hands' keypoints in 3D, sized in metres. Set the fov to your webcam's
-        horizontal field of view: it calibrates their depth, and they stay on their pixels whatever it is.
-        Bring thumb and index together to pinch.</p>
       <p>Code: <a href="https://github.com/ocramz/hand-gesture-web-interfaces">hand-gesture-web-interfaces</a>
         (AGPL-3.0), <a href="https://www.npmjs.com/package/@ocramz/handpose">@ocramz/handpose</a>. The hand-pose
         weights are for non-commercial use only
